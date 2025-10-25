@@ -12,24 +12,22 @@ BSC_TESTNET_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
 # alchemy_url = f"https://eth-mainnet.alchemyapi.io/v2/{alchemy_token}"
 # infura_url = f"https://mainnet.infura.io/v3/{infura_token}"
 
-# BSC Testnet RPC URL provided in the assignment instructions
-BSC_TESTNET_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
-
 def connect_to_eth():
 	"""
 	Connects to the BSC Testnet.
 	"""
+	# Connect to the BSC Testnet RPC
 	w3 = Web3(HTTPProvider(BSC_TESTNET_URL))
+	
+	# Required for BSC Testnet and fixes the "extraData" error
+	w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+	
 	if not w3.is_connected():
 		raise ConnectionError("Failed to connect to the BSC Testnet RPC.")
 	return w3
 
 
 def connect_with_middleware(contract_json):
-	"""
-	Connects to BSC Testnet, loads the contract, and applies POA middleware.
-	"""
-	# TODO insert your code for this method from last week's assignment
 	"""
 	Connects to BSC Testnet, loads the contract, and applies POA middleware.
 	"""
@@ -63,18 +61,11 @@ def is_ordered_block(w3, block_num):
 	"""
 	Takes a block number
 	Returns a boolean that tells whether all the transactions in the block are ordered by priority fee
-
-	Before EIP-1559, a block is ordered if and only if all transactions are sorted in decreasing order of the gasPrice field
-
-	After EIP-1559, there are two types of transactions
-		*Type 0* The priority fee is tx.gasPrice - block.baseFeePerGas
-		*Type 2* The priority fee is min( tx.maxPriorityFeePerGas, tx.maxFeePerGas - block.baseFeePerGas )
-
-	Conveniently, most type 2 transactions set the gasPrice field to be min( tx.maxPriorityFeePerGas + block.baseFeePerGas, tx.maxFeePerGas )
 	"""
 	
 	try:
 		# Fetch the block with transaction hashes
+		# This call will now work thanks to the middleware in connect_to_eth()
 		block = w3.eth.get_block(block_num, full_transactions=False)
 	except Exception as e:
 		print(f"Error fetching block {block_num}: {e}")
@@ -124,7 +115,7 @@ def is_ordered_block(w3, block_num):
 	return True
 
 
-def get_contract_values():
+def get_contract_values(contract, admin_address, owner_address):
 	"""
 	Connects to the contract and retrieves three values:
 	1. The merkleRoot
@@ -134,20 +125,12 @@ def get_contract_values():
 	These values are retrieved from the contract at: 0xaA7CAaDA823300D18D3c43f65569a47e78220073
 	"""
 	
-	# Connect to the chain and contract
-	try:
-		w3, contract = connect_with_middleware('contract_info.json')
-	except Exception as e:
-		print(f"Error connecting to contract: {e}")
-		return None, None, None
+	# The autograder passes the contract and addresses in.
+	# We no longer need to connect here.
 
-	# Addresses and roles needed for the calls
-	admin_address = "0xAC55e7d73A792fE1A9e051BDF4A010c33962809A"
-	owner_address = "0x793A37a85964D96ACD6368777c7C7050F05b11dE"
 	default_admin_role = int.to_bytes(0, 32, byteorder="big")
 
 	try:
-		# TODO complete the following lines by performing contract calls
 		# Get and return the merkleRoot from the provided contract
 		onchain_root = contract.functions.merkleRoot().call()
 		
@@ -172,8 +155,9 @@ if __name__ == "__main__":
 	# These are addresses associated with the Merkle contract (check on contract
 	# functions and transactions on the block explorer at
 	# https://testnet.bscscan.com/address/0xaA7CAaDA823300D18D3c43f65569a47e78220073
+	admin_address = "0xAC55e7d73A792fE1A9e051BDF4A010c33962809A"
+	owner_address = "0x793A37a85964D96ACD6368777c7C7050F05b11dE"
 	
-	# Test connection
 	print("Testing connections...")
 	try:
 		w3_eth = connect_to_eth()
@@ -184,36 +168,28 @@ if __name__ == "__main__":
 	except Exception as e:
 		print(f"Connection tests failed: {e}")
 
-	# Test block ordering (Example block numbers from BSC testnet)
-	# You can find recent blocks on https://testnet.bscscan.com/
 	print("\nTesting block ordering...")
-	# Note: You should test with actual recent blocks
-	
 	try:
-		if 'w3' in locals() and w3.is_connected():
-			latest_block_num = w3.eth.block_number
+		if 'w3_eth' in locals() and w3_eth.is_connected():
+			latest_block_num = w3_eth.eth.block_number
 			print(f"Checking block {latest_block_num} for ordering...")
-			ordered = is_ordered_block(w3, latest_block_num)
+			ordered = is_ordered_block(w3_eth, latest_block_num)
 			print(f"Block {latest_block_num} is ordered: {ordered}")
-			
-			# Checking an older block that might have txs
-			block_to_check = latest_block_num - 100 
-			print(f"Checking block {block_to_check} for ordering...")
-			ordered_check = is_ordered_block(w3, block_to_check)
-			print(f"Block {block_to_check} is ordered: {ordered_check}")
 		else:
 			print("Skipping block ordering test, connection not established.")
-
 	except Exception as e:
 		print(f"Error checking block ordering: {e}")
 
 
-	# Test contract values
 	print("\nTesting contract values...")
 	try:
-		root, role, prime_val = get_contract_values()
-		print(f"Merkle Root: {root}")
-		print(f"Admin Has Role: {role}")
-		print(f"Owner's Prime: {prime_val}")
+		# We must pass the objects to the function, just like the autograder
+		if 'contract' in locals():
+			root, role, prime_val = get_contract_values(contract, admin_address, owner_address)
+			print(f"Merkle Root: {root}")
+			print(f"Admin Has Role: {role}")
+			print(f"Owner's Prime: {prime_val}")
+		else:
+			print("Skipping contract values test, connection not established.")
 	except Exception as e:
 		print(f"Error getting contract values: {e}")
