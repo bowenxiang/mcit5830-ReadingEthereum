@@ -13,17 +13,9 @@ BSC_TESTNET_URL = "https://data-seed-prebsc-1-s1.binance.org:8545/"
 # infura_url = f"https://mainnet.infura.io/v3/{infura_token}"
 
 def connect_to_eth():
-	"""
-	Connects to the BSC Testnet.
-	"""
-	# Connect to the BSC Testnet RPC
-	w3 = Web3(HTTPProvider(BSC_TESTNET_URL))
-	
-	# Required for BSC Testnet and fixes the "extraData" error
-	w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
-	
-	if not w3.is_connected():
-		raise ConnectionError("Failed to connect to the BSC Testnet RPC.")
+	url = "https://eth-mainnet.g.alchemy.com/v2/WMoV3ya-pyB8BLRr2aPrG"
+	w3 = Web3(HTTPProvider(url))
+	assert w3.is_connected(), f"Failed to connect to provider at {url}"
 	return w3
 
 
